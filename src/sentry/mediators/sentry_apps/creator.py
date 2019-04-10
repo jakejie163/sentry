@@ -4,6 +4,7 @@ import six
 
 from collections import Iterable
 
+from sentry import analytics
 from sentry.utils.audit import create_audit_entry
 from sentry.mediators import Mediator, Param
 from sentry.models import (AuditLogEntryEvent, ApiApplication, SentryApp, SentryAppComponent, User,)
@@ -21,6 +22,7 @@ class Creator(Mediator):
     schema = Param(dict, default=lambda self: {})
     overview = Param(six.string_types, required=False)
     request = Param('rest_framework.request.Request', required=False)
+    user = Param('sentry.models.User')
 
     def call(self):
         self.proxy = self._create_proxy_user()
@@ -43,7 +45,7 @@ class Creator(Mediator):
     def _create_sentry_app(self):
         from sentry.mediators.service_hooks.creator import expand_events
 
-        return SentryApp.objects.create(
+        self.sentry_app = SentryApp.objects.create(
             name=self.name,
             author=self.author,
             application_id=self.api_app.id,
@@ -57,6 +59,8 @@ class Creator(Mediator):
             is_alertable=self.is_alertable,
             overview=self.overview,
         )
+
+        return self.sentry_app
 
     def _create_ui_components(self):
         schema = self.schema or {}
@@ -79,3 +83,11 @@ class Creator(Mediator):
                     'sentry_app': self.app.name,
                 },
             )
+
+    def record_analytics(self):
+        analytics.record(
+            'sentry_app.created',
+            user_id=self.user.id,
+            organization_id=self.organization.id,
+            sentry_app=self.sentry_app.slug,
+        )
