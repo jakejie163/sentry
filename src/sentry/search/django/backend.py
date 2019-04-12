@@ -121,6 +121,8 @@ class QCallbackCondition(Condition):
                         search_filter,
                     ),
                 )
+            queryset_method = queryset.filter if search_filter.operator == '=' else queryset.exclude
+            queryset = queryset_method(q)
         else:
             queryset = queryset.filter(q)
         return queryset
